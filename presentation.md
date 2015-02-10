@@ -6,70 +6,22 @@ class: center, middle
 *Examples provided use rspec*
 
 ---
-
-# Types Of Test Doubles
-
-1. Stubs
-
---
-
-  Simple object that stands in for another object during testing
-
---
-
-2. Mocks
-
---
-
-  Very much like a stub, except that they themselves have expectations built
-  into them
-
---
-
-3. Spies
-
---
-
-  Used in conjunction with a stub to provide the same tests as a mock
-
---
-
-4. Fakes
-
---
-
-  Implementations of real objects with plain ruby
-
----
-
-# Stubs
-
---
-
-* Simply stands in for another object in testing
-
---
-
-* Best for testing query methods
-
---
-
-* Strict by default
-
----
 # Player Class
 ```ruby
 class Player
-  def initialize(name)
+  def initialize(name='Anonymous')
     @name = name
   end
 
   def top_scores
     Game.top_scores_for_player(self)
   end
+
+  def share
+    TwitterClient.post(@name, top_scores)
+  end
 end
 ```
-
 ---
 # Game Class
 ```ruby
@@ -99,8 +51,25 @@ end
 
 ```
 ---
+
+# Stubs
+
+--
+
+* Simple object that stands in for another object during testing
+
+--
+
+* Best for testing query methods
+
+--
+
+* Strict by default
+
+---
 # Testing .top_scores for player
-Without stubs:
+
+## Without stubs:
 
 ```ruby
 describe Player do
@@ -120,12 +89,12 @@ end
 
 * Test setup is complex
 
-* Tests Game model logic within Player model tests
+* Tests Game logic within Player tests
 
 ---
 # Testing .top_scores for player
 
-With stubs:
+## With stubs:
 
 ```ruby
 describe Player do
@@ -146,12 +115,22 @@ end
 ---
 
 # Mocks
+--
+
+* Acts very similar to a stub
+
+--
+
+* Sets an expectation that something will happen
+
+--
+
+* Best used for command methods, such as mailers or loggers
 
 ---
 
-# Testing .share for player
 
-With stub:
+## With stub:
 
 ```ruby
 describe '.share' do
@@ -160,7 +139,6 @@ describe '.share' do
     allow(Game).to receive(:top_scores_for_player).
       and_return(top_scores)
 
-    # will pass regardless of whether or not post actually gets called
     allow(TwitterClient).to receive(:post).with('frank', top_scores)
 
     player = Player.new('frank')
@@ -173,9 +151,43 @@ end
   positive test result
 
 ---
+#### Test for .share with stubs
+```ruby
+describe '.share' do
+  it 'should post the top 5 scores to twitter' do
+    top_scores = double("top_scores")
+    allow(Game).to receive(:top_scores_for_player).
+      and_return(top_scores)
+
+    allow(TwitterClient).to receive(:post).with('frank', top_scores)
+
+    player = Player.new('frank')
+    player.share
+  end
+end
+```
+--
+
+#### Passes test
+
+```ruby
+def share
+  TwitterClient.post(@name, top_scores)
+end
+```
+--
+
+#### Also passes test
+
+```ruby
+def share
+end
+```
+---
+
 # Testing .share for player
 
-With mock:
+## With mock:
 
 ```ruby
 describe '.share'
@@ -191,18 +203,129 @@ describe '.share'
   end
 end
 ```
+* Mock used here will fail if post is not called on TwitterClient
+
 ---
 
+#### Test for .share with mocks
+```ruby
+describe '.share' do
+  it 'should post the top 5 scores to twitter' do
+    top_scores = double("top_scores")
+    allow(Game).to receive(:top_scores_for_player).
+      and_return(top_scores)
+
+    expect(TwitterClient).to receive(:post).with('frank', top_scores)
+
+    player = Player.new('frank')
+    player.share
+  end
+end
+```
+--
+
+#### Passes test
+```ruby
+def share
+  TwitterClient.post(@name, top_scores)
+end
+```
+--
+
+#### Fails test
+```ruby
+def share
+end
+> # Failure/Error: expect(TwitterClient).to receive(:post).with('frank', top_scores)
+```
+---
 # Spies
 
+--
+
+* Used in conjunction with a stub to provide the same tests as a mock
+
+--
+
+* Moves expectations (verifications) to the bottom of the tests allowing your tests to
+  follow the pattern of setup, exercise, verify
+
 ---
 
+#### Test for .share with spies
+```ruby
+describe '.share' do
+  it 'should post the top 5 scores to twitter' do
+    top_scores = double("top_scores")
+    allow(Game).to receive(:top_scores_for_player).
+      and_return(top_scores)
+    allow(TwitterClient).to receive(:post).with('frank', top_scores)
+
+    player = Player.new('frank')
+    player.share
+
+    expect(TwitterClient).to have_received(:post).with('frank', top_scores)
+  end
+end
+```
+---
 # Fakes
 
+--
+
+* Implementations of real objects with plain ruby
+
+--
+
+* Can be great when you need to share between tests
+
+--
+
+* Costly due to the fact that you have to implement the actual code
+
+--
+
+* I see them as a last resort and rarely find uses for them
+
+---
+
+#### FakeTwitter - Fake Implementation of Twitter Service
+
+```ruby
+class FakeTwitter < Sinatra::Base
+  post '/frank/tweets' do
+    content_type :json
+    status 200
+    {message: "Success!!!"}.to_json
+  end
+
+  post '/bad_user/tweets' do
+    content_type :json
+    status 400
+    {message: "Bad User!!!"}.to_json
+  end
+end
+```
+```ruby
+describe TwitterClient do
+  describe '.post' do
+    it 'should post messages to twitter' do
+      result = TwitterClient.post('frank', 'hello')
+
+      expect(result.code).to eq("200")
+    end
+
+    it 'should throw a 400 when a bad user is passed to it' do
+      result = TwitterClient.post('bad_user', 'waht')
+
+      expect(result.code).to eq("400")
+    end
+  end
+end
+```
 ---
 
 class: center, middle
 
-# Thank you for joining us
-
+# Thank you
 

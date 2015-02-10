@@ -57,5 +57,19 @@ describe Player do
         player.share
       end
     end
+
+    context 'with spy' do
+      it 'should post the top 5 scores to twitter' do
+        top_scores = double("top_scores")
+        allow(Game).to receive(:top_scores_for_player).
+          and_return(top_scores)
+        allow(TwitterClient).to receive(:post).with('frank', top_scores)
+
+        player = Player.new('frank')
+        player.share
+
+        expect(TwitterClient).to have_received(:post).with('frank', top_scores)
+      end
+    end
   end
 end
